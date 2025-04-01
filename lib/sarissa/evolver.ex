@@ -9,10 +9,6 @@ defmodule Sarissa.Evolver do
       @behaviour unquote(__MODULE__)
       @before_compile unquote(__MODULE__)
 
-      @impl unquote(__MODULE__)
-      def initialize(_opts), do: %{}
-      defoverridable initialize: 1
-
       @spec evolve(opts :: keyword) :: term
       def evolve(opts) do
         channel = opts[:channel] || raise "no :channel defined"
