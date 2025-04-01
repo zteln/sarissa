@@ -5,13 +5,14 @@ defmodule Sarissa.EventStore.Converter do
   end
 
   def from_store(%Spear.Event{} = event) do
-    mod = Module.concat([event.type])
+    mod = Module.concat([Sarissa.Events, event.type])
     body = event.body
-    new = struct(mod, %{})
 
-    Map.keys(new)
-    |> Enum.reduce(new, fn field, acc ->
-      Map.put(acc, field, Map.get(body, to_string(field)))
+    mod.__struct__()
+    |> Map.from_struct()
+    |> Map.keys()
+    |> Enum.reduce(mod.__struct__(), fn field, acc ->
+      %{acc | field => Map.get(body, to_string(field))}
     end)
   end
 end
