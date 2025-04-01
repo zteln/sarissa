@@ -5,6 +5,8 @@ defmodule Sarissa.EventStore.Writer do
 
   @spec write_events(channel :: Channel.t(), events :: Enumerable.t()) ::
           {:ok, Channel.t()} | {:error, term}
+  def write_events(%Channel{} = channel, []), do: {:ok, channel}
+
   def write_events(%Channel{} = channel, events) do
     revision = if channel.revision == :start, do: :empty, else: channel.revision
 
