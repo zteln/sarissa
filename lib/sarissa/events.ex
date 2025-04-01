@@ -11,9 +11,11 @@ defmodule Sarissa.Events do
       contents =
         quote bind_quoted: [fields: unquote(fields)] do
           defstruct fields ++ [:metadata]
+          @type t :: %__MODULE__{}
         end
 
-      Module.create(unquote(name), contents, Macro.Env.location(__ENV__))
+      mod_name = Module.concat(unquote(__MODULE__), unquote(name))
+      Module.create(mod_name, contents, Macro.Env.location(__ENV__))
     end
   end
 end
