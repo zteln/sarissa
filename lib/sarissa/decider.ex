@@ -52,18 +52,20 @@ defmodule Sarissa.Decider do
     def handle_event(%Event{} = event, state), do: [event | state]
 
     @impl Sarissa.Decider
-    def state(opts), do: Sarissa.Projector.state(__MODULE__)
+    def state(opts), do: Sarissa.Projector.state(opts[:projector])
 
     @impl Sarissa.Decider
     def decide(%__MODULE__{} = _query, state) do
       {:read, Enum.map(state, &Map.get(&1, :name))}
     end
   end
+  Sarissa.Decider.execute(%Query{}, [projector: projector])
   ```
   """
 
   alias Sarissa.EventStore.Writer
   alias Sarissa.EventStore.Channel
+  @callback channel(id :: String.t(), opts :: keyword) :: Channel.t()
   @callback state(opts :: keyword) :: term
   @callback decide(command_or_query :: struct, state :: term) :: {:write | :read | :error, term}
   defmacro __using__(fields) do
@@ -72,12 +74,22 @@ defmodule Sarissa.Decider do
 
       @enforce_keys [:id]
       defstruct unquote(fields)
+
+      @impl unquote(__MODULE__)
+      def channel(_id, _opts), do: nil
+      defoverridable channel: 2
     end
   end
 
   @spec execute(command_or_query :: struct, opts :: keyword) ::
           {:ok, Channel.t() | term} | {:error, term}
   def execute(%mod{} = command_or_query, opts \\ []) do
+    channel =
+      opts[:channel] ||
+        mod.channel(command_or_query.id, opts) ||
+        raise "no :channel specified"
+
+    opts = Keyword.put(opts, :channel, channel)
     state = mod.state(opts)
 
     case mod.decide(command_or_query, state) do
