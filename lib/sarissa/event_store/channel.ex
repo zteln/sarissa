@@ -15,16 +15,23 @@ defmodule Sarissa.EventStore.Channel do
 
   @spec update_revision_with(channel :: t(), with :: non_neg_integer) :: t()
   def update_revision_with(channel, with) do
-    revision = if channel.revision == :start, do: 0, else: channel.revision
-    %{channel | revision: revision + with}
+    revision =
+      if channel.revision == :start do
+        with - 1
+      else
+        channel.revision - with
+      end
+
+    %{channel | revision: revision}
   end
 
   defp name(channel, name, opts) do
     cond do
+      name == :all -> %{channel | name: name}
       not is_nil(opts[:id]) -> %{channel | name: "#{name}-#{opts[:id]}"}
       opts[:type] == :by_category -> %{channel | name: "$ce-#{name}"}
       opts[:type] == :by_event_type -> %{channel | name: "$et-#{name}"}
-      true -> raise "no valid names for channel"
+      true -> raise "no valid names or types for channel"
     end
   end
 
