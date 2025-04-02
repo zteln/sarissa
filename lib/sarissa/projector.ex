@@ -67,8 +67,15 @@ defmodule Sarissa.Projector do
 
       @impl GenServer
       def handle_info({:event, event}, state) do
+        revision = get_in(event, [Access.key(:metadata), Access.key(:revision)])
         projection = handle_event(event, state.projection)
-        {:noreply, %{state | projection: projection}}
+
+        {:noreply,
+         %{
+           state
+           | projection: projection,
+             channel: Sarissa.EventStore.Channel.update_revision(state.channel, revision)
+         }}
       end
 
       defp catch_up(state) do
