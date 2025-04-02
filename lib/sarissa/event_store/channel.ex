@@ -22,9 +22,11 @@ defmodule Sarissa.EventStore.Channel do
   def update_revision_with(channel, with) do
     revision =
       if channel.revision == :start do
-        with - 1
+        # TODO +/-1 ??
+        # with - 1
+        with
       else
-        channel.revision - with
+        channel.revision + with
       end
 
     update_revision(channel, revision)
