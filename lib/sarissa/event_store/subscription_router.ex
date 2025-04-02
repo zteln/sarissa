@@ -1,4 +1,5 @@
 defmodule Sarissa.EventStore.SubscriptionRouter do
+  # TODO refactor into separate functions
   use GenServer
   alias Sarissa.EventStore
 
@@ -10,6 +11,10 @@ defmodule Sarissa.EventStore.SubscriptionRouter do
 
   def start_subscription(pid, channel) do
     GenServer.call(__MODULE__, {:start_subscription, pid, channel})
+  end
+
+  def cancel_subscription(pid, channel) do
+    GenServer.call(__MODULE__, {:cancel_subscription, pid})
   end
 
   @impl GenServer
@@ -32,17 +37,44 @@ defmodule Sarissa.EventStore.SubscriptionRouter do
     {:reply, :ok, state}
   end
 
+  def handle_call({:cancel_subscription, pid}, _from, state) do
+    link_pid = Map.get(state.callers, pid)
+    :ok = GenServer.stop(link_pid)
+
+    state = %{
+      state
+      | callers: Map.delete(state.callers, pid),
+        links: Map.delete(state.links, link_pid)
+    }
+
+    {:reply, :ok, state}
+  end
+
   @impl GenServer
   def handle_info({:DOWN, _monitor_ref, :process, pid, _exit_reason}, state) do
-    if Map.has_key?(state.callers, pid) do
-      link_pid = Map.get(state.callers, pid)
-      %{state | callers: Map.delete(state.callers, pid), links: Map.delete(state.links, link_pid)}
-    else
-      caller_pid = Map.get(state.links, pid)
-      # TODO
-      # Restart subscription
-    end
+    state =
+      if Map.has_key?(state.callers, pid) do
+        link_pid = Map.get(state.callers, pid)
+        :ok = GenServer.stop(link_pid)
+
+        %{
+          state
+          | callers: Map.delete(state.callers, pid),
+            links: Map.delete(state.links, link_pid)
+        }
+      else
+        caller_pid = Map.get(state.links, pid)
+        Sarissa.Projector.start_subscription(caller_pid)
+
+        %{
+          state
+          | callers: Map.delete(state.callers, caller_pid),
+            links: Map.delete(state.links, pid)
+        }
+      end
 
     {:noreply, state}
   end
+
+  def handle_info(_msg, state), do: {:noreply, state}
 end

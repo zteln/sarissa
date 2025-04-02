@@ -13,60 +13,60 @@ defmodule Sarissa.Decider do
   A simple command that pushes events into a list as state.
   The decision is made on the length of the state.
   The state is received by using `Sarissa.Evolver`.
-  ```elixir
-  defmodule Command do
-    use Sarissa.Decider, [:id]
-    use Sarissa.Evolver
+    ```elixir
+    defmodule Command do
+      use Sarissa.Decider, [:id]
+      use Sarissa.Evolver
 
-    @impl Sarissa.Evolver
-    def initialize(_opts), do: []
+      @impl Sarissa.Evolver
+      def initialize(_opts), do: []
 
-    @impl Sarissa.Evolver
-    def handle_event(%Event{} = event, state), do: [event | state]
+      @impl Sarissa.Evolver
+      def handle_event(%Event{} = event, state), do: [event | state]
 
-    @impl Sarissa.Decider
-    def state(opts), do: evolve(opts)
+      @impl Sarissa.Decider
+      def state(opts), do: evolve(opts)
 
-    @impl Sarissa.Decider
-    def decide(%__MODULE__{} = _command, state) do
-      if length(state) < 5 do
-        {:write, [%Event{}]}
-      else
-        {:error, :invalid_command}
+      @impl Sarissa.Decider
+      def decide(%__MODULE__{} = _command, state) do
+        if length(state) < 5 do
+          {:write, [%Event{}]}
+        else
+          {:error, :invalid_command}
+        end
       end
     end
-  end
-  Sarissa.Decider.execute(%Command{}, [channel: channel])
-  ```
+    Sarissa.Decider.execute(%Command{}, [channel: channel])
+    ```
 
   A simple query that uses `Sarissa.Projector` to keep state alive.
-  ```elixir
-  defmodule Query do
-    use Sarissa.Decider, [:id]
-    use Sarissa.Projector
+    ```elixir
+    defmodule Query do
+      use Sarissa.Decider, [:id]
+      use Sarissa.Projector
 
-    @impl Sarissa.Evolver
-    def initialize(_opts), do: []
+      @impl Sarissa.Evolver
+      def initialize(_opts), do: []
 
-    @impl Sarissa.Evolver
-    def handle_event(%Event{} = event, state), do: [event | state]
+      @impl Sarissa.Evolver
+      def handle_event(%Event{} = event, state), do: [event | state]
 
-    @impl Sarissa.Decider
-    def state(opts), do: Sarissa.Projector.state(opts[:projector])
+      @impl Sarissa.Decider
+      def state(opts), do: Sarissa.Projector.state(opts[:projector])
 
-    @impl Sarissa.Decider
-    def decide(%__MODULE__{} = _query, state) do
-      {:read, Enum.map(state, &Map.get(&1, :name))}
+      @impl Sarissa.Decider
+      def decide(%__MODULE__{} = _query, state) do
+        {:read, Enum.map(state, &Map.get(&1, :name))}
+      end
     end
-  end
-  Sarissa.Decider.execute(%Query{}, [projector: projector])
-  ```
+    Sarissa.Decider.execute(%Query{}, [projector: projector])
+    ```
   """
 
   alias Sarissa.EventStore.Writer
   alias Sarissa.EventStore.Channel
   @callback channel(id :: String.t(), opts :: keyword) :: Channel.t()
-  @callback state(opts :: keyword) :: term
+  @callback state(channel :: Channel.t(), opts :: keyword) :: {Channel.t(), term}
   @callback decide(command_or_query :: struct, state :: term) :: {:write | :read | :error, term}
   defmacro __using__(fields) do
     quote do
@@ -89,12 +89,10 @@ defmodule Sarissa.Decider do
         mod.channel(command_or_query.id, opts) ||
         raise "no :channel specified"
 
-    opts = Keyword.put(opts, :channel, channel)
-    state = mod.state(opts)
+    {channel, state} = mod.state(channel, opts)
 
     case mod.decide(command_or_query, state) do
       {:write, events} ->
-        channel = opts[:channel] || "no :channel defined"
         Writer.write_events(channel, events)
 
       {:read, result} ->

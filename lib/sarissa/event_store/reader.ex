@@ -14,6 +14,6 @@ defmodule Sarissa.EventStore.Reader do
 
   @spec subscribe(channel :: Channel.t()) :: {:ok, reference} | {:error, term}
   def subscribe(channel) do
-    SubscriptionRouter.start_subscription(self(), channel)
+    SubscriptionRouter.start_subscription(self(), channel, from: channel.revision)
   end
 end

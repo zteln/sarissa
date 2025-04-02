@@ -13,6 +13,11 @@ defmodule Sarissa.EventStore.Channel do
     |> revision(opts)
   end
 
+  @spec update_revision(channel :: t(), revision :: non_neg_integer | :start) :: t()
+  def update_revision(channel, revision) do
+    %{channel | revision: revision}
+  end
+
   @spec update_revision_with(channel :: t(), with :: non_neg_integer) :: t()
   def update_revision_with(channel, with) do
     revision =
@@ -22,7 +27,7 @@ defmodule Sarissa.EventStore.Channel do
         channel.revision - with
       end
 
-    %{channel | revision: revision}
+    update_revision(channel, revision)
   end
 
   defp name(channel, name, opts) do

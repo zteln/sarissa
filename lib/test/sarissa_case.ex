@@ -28,8 +28,12 @@ defmodule SarissaCase do
             error
         end
 
+      # TODO fix escaping of structs in assert
       quote do
-        assert unquote(Macro.escape(t)) = unquote(Macro.escape(result))
+        assert match?(
+                 unquote(Macro.escape(t)),
+                 unquote(Macro.escape(result))
+               )
       end
       |> Code.eval_quoted()
     end

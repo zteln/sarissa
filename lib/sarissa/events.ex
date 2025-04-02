@@ -10,7 +10,10 @@ defmodule Sarissa.Events do
     quote do
       contents =
         quote bind_quoted: [fields: unquote(fields)] do
-          defstruct fields ++ [:metadata]
+          @derive {Jason.Encoder, only: fields}
+          # TODO default to struct (broken due to gwt macro)
+          # defstruct fields ++ [metadata: %Sarissa.Events.Metadata{}]
+          defstruct fields ++ [metadata: %{}]
           @type t :: %__MODULE__{}
         end
 

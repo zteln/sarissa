@@ -13,6 +13,10 @@ defmodule Sarissa.Projector do
 
   def state(projector, timeout \\ 5000), do: call(projector, :get_projection_state, timeout)
 
+  def catch_up(projector), do: call(projector, :catch_up)
+  def start_subscription(projector), do: call(projector, :start_subscription)
+  def cancel_subscription(projector), do: call(projector, :cancel_subscription)
+
   defmacro __using__(_opts) do
     quote do
       use Sarissa.Evolver
@@ -33,9 +37,12 @@ defmodule Sarissa.Projector do
 
       @impl GenServer
       def handle_continue(:evolve, state) do
-        projection = evolve(channel: state.channel)
-        Sarissa.EventStore.Reader.subscribe(state.channel)
-        {:noreply, %{state | projection: projection}}
+        state =
+          state
+          |> catch_up()
+          |> subscribe()
+
+        {:noreply, state}
       end
 
       @impl GenServer
@@ -43,10 +50,35 @@ defmodule Sarissa.Projector do
         {:reply, state.projection, state}
       end
 
+      def handle_call(:catch_up, _from, state) do
+        state = catch_up(state)
+        {:reply, :ok, state}
+      end
+
+      def handle_call(:start_subscription, _from, state) do
+        subscribe(state)
+        {:reply, :ok, state}
+      end
+
+      def handle_call(:cancel_subscription, _from, state) do
+        Sarissa.EventStore.SubscriptionRouter.cancel_subscription(self())
+        {:reply, :ok, state}
+      end
+
       @impl GenServer
       def handle_info({:event, event}, state) do
         projection = handle_event(event, state.projection)
         {:noreply, %{state | projection: projection}}
+      end
+
+      defp catch_up(state) do
+        {channel, state} = evolve(channel: state.channel)
+        %{state | projection: projection, channel: channel}
+      end
+
+      defp subscribe(state) do
+        Sarissa.EventStore.SubscriptionRouter.start_subscription(self(), state.channel)
+        state
       end
     end
   end
