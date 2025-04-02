@@ -31,9 +31,8 @@ defmodule Sarissa.EventStore.SubscriptionLink do
   end
 
   @impl GenServer
-  def handle_info(%Spear.Event{} = spear_event, state) do
-    event = Converter.from_store(spear_event)
-    send(state.pid, {:event, event})
+  def handle_info(%Spear.Event{} = event, state) do
+    send(state.pid, {:event, Converter.from_store(event)})
     {:noreply, state}
   end
 
