@@ -11,8 +11,6 @@ defmodule Sarissa.Events do
       contents =
         quote bind_quoted: [fields: unquote(fields)] do
           @derive {Jason.Encoder, only: fields}
-          # TODO default to struct (broken due to gwt macro)
-          # defstruct fields ++ [metadata: %Sarissa.Events.Metadata{}]
           defstruct fields ++ [metadata: %{}]
           @type t :: %__MODULE__{}
         end
@@ -20,5 +18,10 @@ defmodule Sarissa.Events do
       mod_name = Module.concat(unquote(__MODULE__), unquote(name))
       Module.create(mod_name, contents, Macro.Env.location(__ENV__))
     end
+  end
+
+  def put_metadata(event, field, metadata) do
+    metadata = Map.put(event.metadata, field, metadata)
+    %{event | metadata: metadata}
   end
 end
