@@ -3,15 +3,16 @@ defmodule Sarissa.Application do
   # for more information on OTP Applications
   @moduledoc false
 
+  # TODO remove
   use Application
 
   @impl true
   def start(_type, _args) do
-    children = [
-      # Starts a worker by calling: Sarissa.Worker.start_link(arg)
-      # {Sarissa.Worker, arg}
-      Sarissa.EventStore.SubscriptionRouter
-    ]
+    children =
+      [
+        # Starts a worker by calling: Sarissa.Worker.start_link(arg)
+        # {Sarissa.Worker, arg}
+      ]
 
     # See https://hexdocs.pm/elixir/Supervisor.html
     # for other strategies and supported options

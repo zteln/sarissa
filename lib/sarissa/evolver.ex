@@ -2,32 +2,43 @@ defmodule Sarissa.Evolver do
   @moduledoc """
   `Sarissa.Evolver` is used to reduce over events in a stream and return a state.
   """
-  @callback initialize(opts :: keyword) :: {Sarissa.EventStore.Channel.t(), term} | term
+  @callback initial_context(opts :: keyword) :: Sarissa.Context.t()
   @callback handle_event(event :: map, state :: term) :: term
   defmacro __using__(_opts) do
     quote do
       @behaviour unquote(__MODULE__)
       @before_compile unquote(__MODULE__)
 
+      @impl unquote(__MODULE__)
+      def initial_context(_opts), do: %Sarissa.Context{}
+      defoverridable initial_context: 1
+
       @spec evolve(channel :: Sarissa.EventStore.Channel.t(), opts :: keyword) ::
               {Sarissa.EventStore.Channel.t(), term}
-      # @spec evolve(opts :: keyword) :: term
-      def evolve(channel, opts \\ []) do
-        {channel, state} =
-          case initialize(opts) do
-            {channel, state} -> {channel, state}
-            state -> {channel, state}
-          end
+      def evolve(events, state) do
+        Enum.reduce(events, state, &handle_event/2)
+      end
 
-        channel
-        |> Sarissa.EventStore.Reader.read_events()
-        # |> Enum.reduce(state, &handle_event/2)
-        |> Enum.reduce({channel, state}, fn event, {channel, state} ->
-          revision = get_in(event, [Access.key(:metadata), Access.key(:revision)])
+      if Sarissa.Decider in Module.get_attribute(__MODULE__, :behaviour) do
+        @impl Sarissa.Decider
+        def context(id, opts) do
+          # TODO alternative to passing id?
+          opts = Keyword.put(opts, :id, id)
+          context = initial_context(opts)
 
-          {Sarissa.EventStore.Channel.update_revision(channel, revision),
-           handle_event(event, state)}
-        end)
+          channel =
+            opts[:channel] ||
+              context.channel ||
+              raise "no channel provided"
+
+          initial_state = context.state
+
+          {:ok, channel, events} = Sarissa.EventStore.Reader.read_events(channel)
+          state = evolve(events, initial_state)
+          Sarissa.Context.new(channel: channel, state: state)
+        end
+
+        defoverridable context: 2
       end
     end
   end

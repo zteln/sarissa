@@ -65,35 +65,35 @@ defmodule Sarissa.Decider do
 
   alias Sarissa.EventStore.Writer
   alias Sarissa.EventStore.Channel
-  @callback channel(id :: String.t(), opts :: keyword) :: Channel.t()
-  @callback state(channel :: Channel.t(), opts :: keyword) :: {Channel.t(), term}
-  @callback decide(command_or_query :: struct, state :: term) :: {:write | :read | :error, term}
+
+  @callback context(id :: term, opts :: keyword) :: Sarissa.Context.new()
+  @callback decide(command_or_query :: struct, state :: term) ::
+              {:write, events :: Enumerable.t(), channel :: Channel.t()}
+              | {:read, result :: term}
+              | {:error, term}
   defmacro __using__(fields) do
     quote do
       @behaviour unquote(__MODULE__)
+      import unquote(__MODULE__)
 
       @enforce_keys [:id]
       defstruct unquote(fields)
 
       @impl unquote(__MODULE__)
-      def channel(_id, _opts), do: nil
-      defoverridable channel: 2
+      def context(_id, opts), do: Sarissa.Context.new()
+      defoverridable context: 2
     end
   end
 
   @spec execute(command_or_query :: struct, opts :: keyword) ::
           {:ok, Channel.t() | term} | {:error, term}
   def execute(%mod{} = command_or_query, opts \\ []) do
-    channel =
-      opts[:channel] ||
-        mod.channel(command_or_query.id, opts) ||
-        raise "no :channel specified"
+    context = mod.context(command_or_query.id, opts)
 
-    {channel, state} = mod.state(channel, opts)
-
-    case mod.decide(command_or_query, state) do
+    case mod.decide(command_or_query, context.state) do
       {:write, events} ->
-        Writer.write_events(channel, events)
+        (context.channel && Writer.write_events(context.channel, events)) ||
+          raise "no channel to write events to"
 
       {:read, result} ->
         {:ok, result}
